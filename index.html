@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LTV Matrix Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input {
+      padding: 6px;
+      width: 100px;
+      margin-top: 5px;
+    }
+    .highlight {
+      font-weight: bold;
+      color: #007700;
+    }
+    table {
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px 12px;
+      text-align: center;
+    }
+    .profitable {
+      background-color: #d4f7d4;
+    }
+    .cell-sub {
+      font-size: 0.75em;
+      color: #444;
+    }
+    .min-highlight {
+      background-color: #ffe599 !important;
+      border: 2px solid #f1b300;
+    }
+  </style>
+</head>
+<body>
+  <h1>LTV Profitability Matrix</h1>
+
+  <label>CPI ($): <input id="cpi" type="number" step="0.01" value="2"></label>
+  <label>LTV per Paying User ($): <input id="ltvPayer" type="number" step="0.1" value="60"></label>
+
+  <div style="margin-top: 10px;" id="resultText"></div>
+  <div style="margin-top: 5px;" id="minLtvRequired"></div>
+
+  <table id="matrix"></table>
+
+  <script>
+    const cpiInput = document.getElementById('cpi');
+    const ltvPayerInput = document.getElementById('ltvPayer');
+    const matrixEl = document.getElementById('matrix');
+    const resultText = document.getElementById('resultText');
+    const minLtvRequired = document.getElementById('minLtvRequired');
+
+    function updateMatrix() {
+      const cpi = parseFloat(cpiInput.value);
+      const ltvPayer = parseFloat(ltvPayerInput.value);
+
+      const startRates = [5,10,15,20,25,30,35,40,45,50];
+      const convRates = [5,10,15,20,25,30,35,40,45,50];
+
+      let html = '<tr><th>Trial Start %</th>';
+      convRates.forEach(cr => html += `<th>${cr}%</th>`);
+      html += '</tr>';
+
+      let foundProfitable = false;
+      let minEffectiveConv = null;
+      let minRow = -1, minCol = -1;
+
+      startRates.forEach((sr, rowIdx) => {
+        html += `<tr><th>${sr}%</th>`;
+        convRates.forEach((cr, colIdx) => {
+          const installConv = sr / 100 * cr / 100;
+          const ltv = installConv * ltvPayer;
+          const isProfitable = ltv >= cpi;
+          let cellClass = "";
+
+          if (isProfitable) {
+            if (!foundProfitable || installConv < minEffectiveConv) {
+              foundProfitable = true;
+              minEffectiveConv = installConv;
+              minRow = rowIdx;
+              minCol = colIdx;
+            }
+            cellClass = 'profitable';
+          }
+
+          html += `<td data-row="${rowIdx}" data-col="${colIdx}" class="${cellClass}">${ltv.toFixed(2)}<div class='cell-sub'>${(installConv * 100).toFixed(2)}%</div></td>`;
+        });
+        html += '</tr>';
+      });
+
+      matrixEl.innerHTML = html;
+
+      // highlight minimum cell
+      if (foundProfitable) {
+        const table = matrixEl.querySelectorAll("tr");
+        const minCell = table[minRow + 1].children[minCol + 1];
+        minCell.classList.add("min-highlight");
+      }
+
+      resultText.innerHTML = `CPI: <span class="highlight">$${cpi.toFixed(2)}</span>, LTV подписки: <span class="highlight">$${ltvPayer.toFixed(2)}</span>`;
+
+      if (minEffectiveConv !== null) {
+        const percent = (minEffectiveConv * 100).toFixed(2);
+        const minLtv = cpi / minEffectiveConv;
+        minLtvRequired.innerHTML = `Минимальная конверсия install → paid: <span class="highlight">${percent}%</span><br>Необходимый LTV подписки: <span class="highlight">$${minLtv.toFixed(2)}</span>`;
+      } else {
+        minLtvRequired.innerHTML = '<span class="highlight">Нет профитных конфигураций</span>';
+      }
+    }
+
+    cpiInput.addEventListener('input', updateMatrix);
+    ltvPayerInput.addEventListener('input', updateMatrix);
+    updateMatrix();
+  </script>
+</body>
+</html>
